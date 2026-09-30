@@ -107,9 +107,10 @@ export function kudosityGetSms(config: KudosityConfig = {}) {
 
   return tool({
     description:
-      "Get a sent SMS message by its id, including its current delivery status: " +
-      "PENDING (queued), SENT (submitted to provider), DELIVERED (confirmed on handset), " +
-      "ACCEPTED (provider accepted, delivery unconfirmed), or FAILED. " +
+      "Get a sent SMS message by its id, including its current delivery status, " +
+      "returned in lowercase: pending (queued), sent (submitted to provider), " +
+      "delivered (confirmed on handset), accepted (provider accepted, delivery " +
+      "unconfirmed), or failed. " +
       "Use the id returned by the send tools to check whether a message arrived.",
     inputSchema: z.object({
       id: z.string().describe("The message id returned when the SMS was sent."),
@@ -163,10 +164,15 @@ export function kudosityListSms(config: KudosityConfig = {}) {
         .string()
         .optional()
         .describe("Filter by the message_ref supplied at send time."),
+      // The API's filter demands uppercase while message objects report
+      // status in lowercase — normalize so either casing works.
       status: z
-        .enum(STATUS_VALUES)
+        .preprocess(
+          (v) => (typeof v === "string" ? v.toUpperCase() : v),
+          z.enum(STATUS_VALUES)
+        )
         .optional()
-        .describe("Filter by delivery status."),
+        .describe("Filter by delivery status, e.g. FAILED or DELIVERED."),
     }),
     execute: async (input) => {
       const res = await get(resolved, "/v2/sms", {
@@ -177,7 +183,9 @@ export function kudosityListSms(config: KudosityConfig = {}) {
         recipient: input.recipient,
         sender: input.sender,
         message_ref: input.message_ref,
-        status: input.status,
+        // normalized here as well as in the schema: direct execute() calls
+        // bypass Zod parsing, and the API rejects lowercase
+        status: input.status?.toUpperCase(),
       });
       return res.ok ? res.body : res.error;
     },

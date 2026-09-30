@@ -36,11 +36,12 @@ describe("kudosityGetSms", () => {
 });
 
 describe("kudosityListSms", () => {
-  it("passes filters as query parameters", async () => {
+  it("passes filters as query parameters, uppercasing the status", async () => {
     const fetch = mockFetch(200, { data: [], total: 0 });
     await callTool(kudosityListSms({ apiKey: "k" }), {
       limit: 10,
-      status: "FAILED",
+      // live API returns lowercase statuses but its filter demands uppercase
+      status: "failed",
       start_date: "2026-09-01T00:00:00Z",
       message_ref: "order-42",
     });
