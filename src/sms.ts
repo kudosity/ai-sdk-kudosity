@@ -1,6 +1,6 @@
 import { tool } from "ai";
 import { z } from "zod";
-import { missingSenderError, post, resolveConfig } from "./http.js";
+import { get, missingSenderError, post, resolveConfig } from "./http.js";
 import type { KudosityConfig } from "./http.js";
 
 export type KudositySendSmsConfig = KudosityConfig;
@@ -85,6 +85,101 @@ export function kudositySendSms(config: KudositySendSmsConfig = {}) {
         sms_count: sms.sms_count,
         message_ref: sms.message_ref,
       };
+    },
+  });
+}
+
+const STATUS_VALUES = [
+  "PENDING",
+  "SENT",
+  "FAILED",
+  "DELIVERED",
+  "ACCEPTED",
+] as const;
+
+/**
+ * Vercel AI SDK tool that retrieves a single sent SMS by id
+ * (GET https://api.transmitmessage.com/v2/sms/{id}), including its current
+ * delivery status.
+ */
+export function kudosityGetSms(config: KudosityConfig = {}) {
+  const resolved = resolveConfig(config);
+
+  return tool({
+    description:
+      "Get a sent SMS message by its id, including its current delivery status: " +
+      "PENDING (queued), SENT (submitted to provider), DELIVERED (confirmed on handset), " +
+      "ACCEPTED (provider accepted, delivery unconfirmed), or FAILED. " +
+      "Use the id returned by the send tools to check whether a message arrived.",
+    inputSchema: z.object({
+      id: z.string().describe("The message id returned when the SMS was sent."),
+    }),
+    execute: async (input) => {
+      const res = await get(
+        resolved,
+        `/v2/sms/${encodeURIComponent(input.id)}`
+      );
+      return res.ok ? res.body : res.error;
+    },
+  });
+}
+
+/**
+ * Vercel AI SDK tool that lists sent SMS messages with filters
+ * (GET https://api.transmitmessage.com/v2/sms).
+ */
+export function kudosityListSms(config: KudosityConfig = {}) {
+  const resolved = resolveConfig(config);
+
+  return tool({
+    description:
+      "List sent SMS messages, filterable by date range, recipient, sender, " +
+      "message_ref and delivery status. Use to review the results of recent sends — " +
+      "e.g. all FAILED messages since a date, or every message sharing a message_ref.",
+    inputSchema: z.object({
+      limit: z
+        .number()
+        .int()
+        .optional()
+        .describe("Maximum number of messages to return. Defaults to 100."),
+      page: z
+        .number()
+        .int()
+        .optional()
+        .describe("Page number, in combination with limit. Defaults to 1."),
+      start_date: z
+        .string()
+        .optional()
+        .describe(
+          "Only messages created after this time, RFC3339 format, e.g. 2026-09-01T00:00:00Z"
+        ),
+      end_date: z
+        .string()
+        .optional()
+        .describe("Only messages created before this time, RFC3339 format."),
+      recipient: z.string().optional().describe("Filter by recipient number."),
+      sender: z.string().optional().describe("Filter by sender."),
+      message_ref: z
+        .string()
+        .optional()
+        .describe("Filter by the message_ref supplied at send time."),
+      status: z
+        .enum(STATUS_VALUES)
+        .optional()
+        .describe("Filter by delivery status."),
+    }),
+    execute: async (input) => {
+      const res = await get(resolved, "/v2/sms", {
+        limit: input.limit !== undefined ? String(input.limit) : undefined,
+        page: input.page !== undefined ? String(input.page) : undefined,
+        start_date: input.start_date,
+        end_date: input.end_date,
+        recipient: input.recipient,
+        sender: input.sender,
+        message_ref: input.message_ref,
+        status: input.status,
+      });
+      return res.ok ? res.body : res.error;
     },
   });
 }

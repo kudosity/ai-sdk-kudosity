@@ -101,9 +101,12 @@ describe("kudositySendRcs", () => {
 });
 
 describe("kudosityTools", () => {
-  it("returns all three tools keyed by tool name", () => {
+  it("returns the V2 tools keyed by tool name", () => {
+    delete process.env.KUDOSITY_API_SECRET;
     const tools = kudosityTools({ apiKey: "k", defaultSender: "S" });
     expect(Object.keys(tools).sort()).toEqual([
+      "kudosity_get_sms",
+      "kudosity_list_sms",
       "kudosity_send_mms",
       "kudosity_send_rcs",
       "kudosity_send_sms",

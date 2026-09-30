@@ -1,12 +1,19 @@
 # ai-sdk-kudosity
 
-[Vercel AI SDK](https://ai-sdk.dev) tools for [Kudosity](https://kudosity.com) — let AI agents send **SMS, MMS and RCS** through the Kudosity messaging platform.
+[Vercel AI SDK](https://ai-sdk.dev) tools for [Kudosity](https://kudosity.com) — give AI agents the full messaging loop on the Kudosity platform: check the account, build contact lists, send **SMS, MMS and RCS**, and read back delivery results.
 
-| Tool | Channel | Endpoint |
+| Tool | What it does | API |
 |---|---|---|
-| `kudositySendSms` | SMS | `POST /v2/sms` |
-| `kudositySendMms` | MMS — image/GIF/video/audio by public URL | `POST /v2/mms` |
-| `kudositySendRcs` | RCS — rich, branded messaging with SMS fallback | `POST /v2/rcs/messages` |
+| `kudosityGetBalance` | Account balance and currency | V1 |
+| `kudosityCreateList` | Create a contact list (with custom fields) | V1 |
+| `kudosityAddToList` | Add a contact to a list | V1 |
+| `kudosityGetLists` | List the account's contact lists and ids | V1 |
+| `kudositySendSms` | Send an SMS to one recipient | V2 |
+| `kudositySendSmsBatch` | Send to a whole list or up to 500 numbers, with scheduling | V1 |
+| `kudositySendMms` | Send media (image/GIF/video/audio) by public URL | V2 |
+| `kudositySendRcs` | Send rich, branded RCS with SMS fallback | V2 |
+| `kudosityGetSms` | Get one sent message and its delivery status | V2 |
+| `kudosityListSms` | Query sent messages by date, recipient, status, message_ref | V2 |
 
 ```bash
 npm install ai-sdk-kudosity ai
@@ -14,46 +21,43 @@ npm install ai-sdk-kudosity ai
 
 ## Setup
 
-Get your API key from the Kudosity dashboard under **Developers → API Settings** and set it in the environment:
+Get your credentials from the Kudosity dashboard under **Developers → API Settings**:
 
 ```bash
 export KUDOSITY_API_KEY="your-api-key"
+export KUDOSITY_API_SECRET="your-api-secret"
 ```
+
+Kudosity has two API generations and the tools span both. The key alone covers the V2 tools (single sends, message results). The secret additionally unlocks the V1 tools (balance, contact lists, batch and scheduled sends).
 
 ## Usage
 
-Each tool is a factory that takes your account defaults and returns a standard AI SDK tool:
+Register everything at once — the agent gets the end-to-end loop:
 
 ```ts
 import { generateText } from "ai";
-import { kudositySendSms } from "ai-sdk-kudosity";
-
-const result = await generateText({
-  model, // any AI SDK model
-  tools: {
-    kudosity_send_sms: kudositySendSms({
-      // a virtual number on your account, or an alphanumeric sender ID (max 11 chars)
-      defaultSender: "61481074185",
-    }),
-  },
-  prompt: "Text 61491570156 that their appointment is tomorrow at 10am.",
-});
-```
-
-Or register all three channels at once:
-
-```ts
 import { kudosityTools } from "ai-sdk-kudosity";
 
 const result = await generateText({
-  model,
-  tools: kudosityTools({
-    defaultSender: "61481074185",
-    // used by the RCS tool when the model adds an SMS fallback
-    defaultFallbackSender: "61481074185",
-  }),
-  prompt: "...",
+  model, // any AI SDK model
+  tools: kudosityTools({ defaultSender: "61481074185" }),
+  prompt:
+    "Create a list called 'VIP customers', add 61491570156 to it, " +
+    "text the list that the sale starts tomorrow, then confirm the send went out.",
 });
+```
+
+`kudosityTools()` always includes the V2 tools; the V1 tools are included when an API secret is configured and omitted otherwise.
+
+Or pick individual tools:
+
+```ts
+import { kudositySendSms, kudosityGetSms } from "ai-sdk-kudosity";
+
+const tools = {
+  kudosity_send_sms: kudositySendSms({ defaultSender: "61481074185" }),
+  kudosity_get_sms: kudosityGetSms(),
+};
 ```
 
 > **RCS note:** the RCS `sender` is a **registered RCS agent ID** provisioned by
@@ -62,28 +66,37 @@ const result = await generateText({
 > tool prompts the model to include `sms_fallback_message` so non-RCS handsets
 > still get the message as SMS.
 
+## Closing the loop on delivery
+
+Every send tool returns a message `id`. The agent can check outcomes two ways:
+
+- **Poll:** `kudosity_get_sms` returns the current status — `PENDING`, `SENT`, `ACCEPTED`, `DELIVERED` or `FAILED` — and `kudosity_list_sms` queries in bulk (for example, every `FAILED` message since a date, or all messages sharing a `message_ref`).
+- **Push:** pass `message_ref` at send time and match it in [delivery webhooks](https://developers.kudosity.com/).
+
+A `PENDING` or `queued` result from a send means the message was accepted, not delivered — delivery confirmation comes from the status tools or webhooks.
+
 ## Configuration
 
 Every factory accepts:
 
 | Option | Description |
 |---|---|
-| `apiKey` | Kudosity V2 API key. Defaults to the `KUDOSITY_API_KEY` environment variable. |
+| `apiKey` | Kudosity API key. Defaults to the `KUDOSITY_API_KEY` environment variable. |
+| `apiSecret` | Kudosity API secret, for V1 tools. Defaults to `KUDOSITY_API_SECRET`. |
 | `defaultSender` | Sender used when the model doesn't supply one per send. |
-| `baseUrl` | Override the API base URL. Defaults to Kudosity production. |
+| `baseUrl` / `v1BaseUrl` | Override the API base URLs. Default to Kudosity production. |
 
 `kudositySendRcs` and `kudosityTools` also accept `defaultFallbackSender` — the
-SMS sender used when the model supplies a fallback message.
+SMS sender used when the model supplies an RCS fallback message.
 
 ## Behavior
 
 - Tool results are structured objects: the message `id` (for matching delivery
   webhooks), `status`, and echo fields like `message_ref`.
-- API errors (RFC 9457 Problem Details) are returned to the model as structured
-  error objects rather than thrown, so the agent can read the failed fields and
-  correct its next call.
-- A `pending` or `queued` status means the message was accepted; real delivery
-  outcomes arrive via [webhooks](https://developers.kudosity.com/).
+- API errors are returned to the model as structured error objects rather than
+  thrown — V2 errors carry RFC 9457 Problem Details (including `issues[]` per
+  failed field), and V1 in-band error codes are surfaced the same way — so the
+  agent can read what failed and correct its next call.
 
 ## License
 
