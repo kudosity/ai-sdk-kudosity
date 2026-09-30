@@ -1,0 +1,52 @@
+{
+  "name": "ai-sdk-kudosity",
+  "version": "0.1.0",
+  "description": "Vercel AI SDK tools for Kudosity — let AI agents send SMS, MMS and RCS through the Kudosity messaging platform.",
+  "license": "MIT",
+  "author": "Kudosity",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kudosity/ai-sdk-kudosity.git"
+  },
+  "homepage": "https://developers.kudosity.com/",
+  "keywords": [
+    "ai-sdk",
+    "vercel-ai-sdk",
+    "ai",
+    "kudosity",
+    "sms",
+    "messaging",
+    "ai-agents",
+    "tools"
+  ],
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "ai": "^5.0.0",
+    "zod": "^3.25.0 || ^4.0.0"
+  },
+  "devDependencies": {
+    "ai": "^5.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^3.0.0",
+    "zod": "^4.6.5"
+  }
+}
