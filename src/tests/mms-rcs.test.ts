@@ -98,6 +98,55 @@ describe("kudositySendRcs", () => {
     );
     expect(body.sms_fallback).toBeUndefined();
   });
+
+  it("sends a carousel and returns the content type", async () => {
+    const fetch = mockFetch(200, {
+      data: { id: "rcs-3", content_type: "rich_card" },
+    });
+    const rcs = kudositySendRcs({ apiKey: "k", defaultSender: "DemoSender" });
+    const out = await callTool(rcs, {
+      recipient: "61491570156",
+      cards: [{ title: "Classic tee" }, { title: "Hoodie" }],
+      suggestions: [{ type: "reply", text: "See more", postback_data: "more" }],
+    });
+    const body = JSON.parse(
+      (fetch.mock.calls[0] as unknown as [string, { body: string }])[1].body
+    );
+    expect(body.content_type).toBe("rich_card");
+    expect(body.content).toEqual({
+      rich_card: {
+        carousel: {
+          card_contents: [{ title: "Classic tee" }, { title: "Hoodie" }],
+        },
+      },
+      suggestions: [{ reply: { text: "See more", postback_data: "more" } }],
+    });
+    expect(out.content_type).toBe("rich_card");
+  });
+
+  it("sends without a fallback and warns when no fallback sender is configured", async () => {
+    const fetch = mockFetch(200, { data: { id: "rcs-4" } });
+    const rcs = kudositySendRcs({ apiKey: "k", defaultSender: "DemoSender" });
+    const out = await callTool(rcs, {
+      recipient: "61491570156",
+      message: "hi",
+      sms_fallback_message: "hi by SMS",
+    });
+    const body = JSON.parse(
+      (fetch.mock.calls[0] as unknown as [string, { body: string }])[1].body
+    );
+    expect(body.sms_fallback).toBeUndefined();
+    expect(out.id).toBe("rcs-4");
+    expect(out.warning).toMatch(/fallback was NOT included/);
+  });
+
+  it("returns a readable error without calling the API when the content is invalid", async () => {
+    const fetch = mockFetch(200, { data: { id: "x" } });
+    const rcs = kudositySendRcs({ apiKey: "k", defaultSender: "DemoSender" });
+    const out = await callTool(rcs, { recipient: "61491570156" });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(out.issues[0]).toMatch(/exactly one of/);
+  });
 });
 
 describe("kudosityTools", () => {

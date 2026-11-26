@@ -1,6 +1,6 @@
 {
   "name": "ai-sdk-kudosity",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Vercel AI SDK tools for Kudosity — let AI agents send SMS, MMS and RCS through the Kudosity messaging platform.",
   "license": "MIT",
   "author": "Kudosity",
