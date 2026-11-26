@@ -1,4 +1,4 @@
-export const PACKAGE_VERSION = "0.1.0";
+export const PACKAGE_VERSION = "0.2.0";
 
 export const DEFAULT_BASE_URL = "https://api.transmitmessage.com";
 export const DEFAULT_V1_BASE_URL = "https://api.transmitsms.com";
